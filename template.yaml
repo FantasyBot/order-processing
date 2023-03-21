@@ -1,0 +1,257 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Order Processing
+
+Parameters:
+  Environment:
+    Type: String
+    AllowedValues:
+      - dev
+      - prod
+
+Globals:
+  Function:
+    Timeout: 12
+    MemorySize: 512
+    Runtime: nodejs16.x
+    CodeUri: lambda_js
+    Architectures:
+      - x86_64
+
+Resources:
+  ApiGateway:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: !Ref Environment
+
+  OrderProcessingTrigger:
+    Type: AWS::Serverless::Function
+    Properties:
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - states:StartExecution
+              Resource:
+                - !Ref OrderProcessing
+      FunctionName: !Sub ${AWS::StackName}-fn-order_processing_trigger
+      Handler: functions/order_processing_trigger/function.handler
+      Environment:
+        Variables:
+          ORDER_PROCESSING_ARN: !Ref OrderProcessing
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            Path: /order_processing
+            Method: POST
+            RestApiId: !Ref ApiGateway
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Target: es2020
+        EntryPoints:
+          - functions/order_processing_trigger/function.ts
+
+  CheckInventory:
+    Type: AWS::Serverless::Function
+    Properties:
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Query
+                - dynamodb:GetItem
+                - dynamodb:Scan
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:DeleteItem
+              Resource:
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${AWS::StackName}-products_db"
+      FunctionName: !Sub ${AWS::StackName}-fn-check_inventory
+      Handler: functions/check_inventory/function.handler
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Target: es2020
+        EntryPoints:
+          - functions/check_inventory/function.ts
+
+  VerifyPayment:
+    Type: AWS::Serverless::Function
+    Properties:
+      Policies:
+        - AWSLambdaBasicExecutionRole
+      FunctionName: !Sub ${AWS::StackName}-fn-verify_payment
+      Handler: functions/verify_payment/function.handler
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Target: es2020
+        EntryPoints:
+          - functions/verify_payment/function.ts
+
+  CreateShippingLabel:
+    Type: AWS::Serverless::Function
+    Properties:
+      Policies:
+        - AWSLambdaBasicExecutionRole
+      FunctionName: !Sub ${AWS::StackName}-fn-create_shipping_label
+      Handler: functions/create_shipping_label/function.handler
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Target: es2020
+        EntryPoints:
+          - functions/create_shipping_label/function.ts
+
+  SendConfirmationEmail:
+    Type: AWS::Serverless::Function
+    Properties:
+      Policies:
+        - AWSLambdaBasicExecutionRole
+      FunctionName: !Sub ${AWS::StackName}-fn-send_confirmation_email
+      Handler: functions/send_confirmation_email/function.handler
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Target: es2020
+        EntryPoints:
+          - functions/send_confirmation_email/function.ts
+
+  OrderProcessingDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub ${AWS::StackName}-order_processing_dlq
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+
+  MyProductsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub ${AWS::StackName}-products_db
+      AttributeDefinitions:
+        - AttributeName: product_id
+          AttributeType: S
+        - AttributeName: product_name
+          AttributeType: S
+      KeySchema:
+        - AttributeName: product_id
+          KeyType: HASH
+        - AttributeName: product_name
+          KeyType: RANGE
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+
+  OrderProcessing:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      Name: !Sub ${AWS::StackName}-sf-order_processing
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            Path: /order
+            Method: POST
+            RestApiId: !Ref ApiGateway
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - lambda:InvokeFunction
+              Resource:
+                - !GetAtt CheckInventory.Arn
+                - !GetAtt VerifyPayment.Arn
+                - !GetAtt CreateShippingLabel.Arn
+                - !GetAtt SendConfirmationEmail.Arn
+            - Effect: Allow
+              Action:
+                - events:PutTargets
+                - events:PutRule
+                - events:DescribeRule
+              Resource:
+                - !Sub "arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/StepFunctionsGetEventsForStepFunctionsExecutionRule"
+            - Effect: Allow
+              Action:
+                - events:PutEvents
+              Resource:
+                - !Sub "arn:aws:events:${AWS::Region}:${AWS::AccountId}:event-bus/default"
+      Definition:
+        Comment: Verify Order Processing Steps
+        StartAt: Check Inventory
+        TimeoutSeconds: 300
+        States:
+          Check Inventory:
+            Type: Task
+            Resource: arn:aws:states:::lambda:invoke
+            OutputPath: $.Payload
+            Parameters:
+              Payload.$: $
+              FunctionName: !Ref CheckInventory
+            Catch:
+              - ErrorEquals:
+                  - States.ALL
+                Comment: Runtime Exception
+                Next: Send Error Message
+            Next: Verify Payment
+          Verify Payment:
+            Type: Task
+            Resource: arn:aws:states:::lambda:invoke
+            OutputPath: $.Payload
+            Parameters:
+              Payload.$: $
+              FunctionName: !Ref VerifyPayment
+            Catch:
+              - ErrorEquals:
+                  - States.ALL
+                Comment: Runtime Exception
+                Next: Send Error Message
+            Next: Create Shipping Label
+          Create Shipping Label:
+            Type: Task
+            Resource: arn:aws:states:::lambda:invoke
+            OutputPath: $.Payload
+            Parameters:
+              Payload.$: $
+              FunctionName: !Ref CreateShippingLabel
+            Catch:
+              - ErrorEquals:
+                  - States.ALL
+                Comment: Runtime Exception
+                Next: Send Error Message
+            Next: Send Confirmation Email
+          Send Confirmation Email:
+            Type: Task
+            Resource: arn:aws:states:::lambda:invoke
+            OutputPath: $.Payload
+            Parameters:
+              Payload.$: $
+              FunctionName: !Ref SendConfirmationEmail
+            Catch:
+              - ErrorEquals:
+                  - States.ALL
+                Comment: Runtime Exception
+                Next: Send Error Message
+            Next: Success
+          Success:
+            Type: Succeed
+          Send Error Message:
+            Type: Task
+            Resource: arn:aws:states:::sqs:sendMessage
+            Parameters:
+              MessageBody.$: $
+              QueueUrl: !Ref OrderProcessingDLQ
+            Next: Fail
+          Fail:
+            Type: Fail
+
+Outputs:
+  ApiID:
+    Value: !Ref ApiGateway
+    Export:
+      Name: !Sub ${AWS::StackName}-ag-id

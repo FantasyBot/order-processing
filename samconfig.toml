@@ -1,0 +1,18 @@
+version=0.1
+
+[dev.deploy.parameters]
+capabilities = "CAPABILITY_IAM CAPABILITY_NAMED_IAM"
+region = "eu-central-1"
+s3_prefix = "order-processing"
+stack_name = "order-processing-dev"
+s3_bucket = "s3-dev-deployment-bucket"
+parameter_overrides="Environment=dev"
+
+
+[prod.deploy.parameters]
+capabilities = "CAPABILITY_IAM"
+region = "eu-central-1"
+s3_prefix = "order-processing"
+stack_name = "order-processing-prod"
+s3_bucket = "s3-prod-deployment-bucket"
+parameter_overrides="Environment=prod"
