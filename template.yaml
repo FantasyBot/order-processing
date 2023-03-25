@@ -64,13 +64,14 @@ Resources:
             - Effect: Allow
               Action:
                 - dynamodb:Query
-                - dynamodb:GetItem
-                - dynamodb:Scan
-                - dynamodb:PutItem
-                - dynamodb:UpdateItem
-                - dynamodb:DeleteItem
+                # - dynamodb:GetItem
+                # - dynamodb:Scan
+                # - dynamodb:PutItem
+                # - dynamodb:UpdateItem
+                # - dynamodb:DeleteItem
               Resource:
                 - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${AWS::StackName}-products_db"
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${AWS::StackName}-products_db/index/product_name-index"
       FunctionName: !Sub ${AWS::StackName}-fn-check_inventory
       Handler: functions/check_inventory/function.handler
     Metadata:
@@ -139,14 +140,32 @@ Resources:
           AttributeType: S
         - AttributeName: product_name
           AttributeType: S
+        - AttributeName: count_in_stock
+          AttributeType: N
       KeySchema:
         - AttributeName: product_id
           KeyType: HASH
-        - AttributeName: product_name
-          KeyType: RANGE
-      ProvisionedThroughput:
-        ReadCapacityUnits: 1
-        WriteCapacityUnits: 1
+      GlobalSecondaryIndexes:
+        - IndexName: product_name-index
+          KeySchema:
+            - AttributeName: product_name
+              KeyType: HASH
+            - AttributeName: product_id
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: count_in_stock-index
+          KeySchema:
+            - AttributeName: count_in_stock
+              KeyType: HASH
+            - AttributeName: product_id
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      BillingMode: PAY_PER_REQUEST
+      # ProvisionedThroughput:
+      #   ReadCapacityUnits: 2
+      #   WriteCapacityUnits: 2
 
   OrderProcessing:
     Type: AWS::Serverless::StateMachine
