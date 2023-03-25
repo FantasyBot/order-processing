@@ -7,16 +7,15 @@ const docClient = new AWS.DynamoDB.DocumentClient({
 export async function handler(input: any) {
   const params = {
     TableName: "order-processing-dev-products_db",
-    IndexName: "product_name-index",
-    KeyConditionExpression: "product_name = :name",
-    FilterExpression: "count_in_stock <= :quantity",
-    ExpressionAttributeValues: {
-      ":name": "ram_240_gtx83-5",
-      ":quantity": 2,
+    Item: {
+      product_name: "ram_240_gtx83-5",
+      product_id: "1ef7578a-cb57-11ed-afa1-0242ac120002",
+      count_in_stock: 43,
+      product_price: 100,
     },
   };
 
-  const data = await docClient.query(params).promise();
+  const data = await docClient.put(params).promise();
   // if (!data?.Item) {
   //   throw new Error("ProductNotProvidedExeption");
   // }
