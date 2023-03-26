@@ -19,6 +19,18 @@ Globals:
       - x86_64
 
 Resources:
+  # DeploymentBucket:
+  #   Type: AWS::S3::Bucket
+  #   Properties:
+  #     BucketName: !Sub ${AWS::StackName}-test-bucket
+  #     BucketEncryption:
+  #       ServerSideEncryptionConfiguration:
+  #         - ServerSideEncryptionByDefault:
+  #             SSEAlgorithm: AES256
+  #     Tags:
+  #       - Key: Environment
+  #         Value: !Ref Environment
+
   ApiGateway:
     Type: AWS::Serverless::Api
     Properties:
