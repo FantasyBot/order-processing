@@ -1,17 +1,14 @@
 import AWS from "aws-sdk";
-const docClient = new AWS.DynamoDB.DocumentClient({
-  apiVersion: "2012-08-10",
-  region: "eu-central-1",
-});
+const docClient = new AWS.DynamoDB.DocumentClient();
 
 export async function handler(input: any) {
   const params = {
-    TableName: "order-processing-dev-products_db",
+    TableName: process.env.PRODUCTS_DB,
     KeyConditionExpression: "product_name = :name",
     FilterExpression: "count_in_stock >= :quantity",
     ExpressionAttributeValues: {
-      ":name": input?.event?.product?.name,
-      ":quantity": input?.event?.product?.quantity,
+      ":name": input?.product?.name,
+      ":quantity": input?.product?.quantity,
     },
   };
 
@@ -32,5 +29,5 @@ export async function handler(input: any) {
     throw new Error("ProductNotProvidedExeption");
   }
 
-  return input;
+  return { ...input, shipping_information: Items[0] };
 }

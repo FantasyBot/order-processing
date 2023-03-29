@@ -1,5 +1,7 @@
-export async function handler(event: any) {
-  console.log("event in check_inventory  ---> ", event);
+export async function handler(input: any) {
+  const { payment_information } = input;
 
-  return event;
+  console.log("Payment info - - - > ", payment_information);
+  // TODO Add payment transaction according to card info
+  return input;
 }

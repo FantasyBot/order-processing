@@ -31,6 +31,41 @@ Resources:
   #       - Key: Environment
   #         Value: !Ref Environment
 
+  ProductsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub ${AWS::StackName}-products_db
+      AttributeDefinitions:
+        - AttributeName: product_name
+          AttributeType: S
+        - AttributeName: product_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: product_name
+          KeyType: HASH
+        - AttributeName: product_id
+          KeyType: RANGE
+      BillingMode: PAY_PER_REQUEST
+      # ProvisionedThroughput:
+      #   ReadCapacityUnits: 2
+      #   WriteCapacityUnits: 2
+
+  ShippingInfoTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub ${AWS::StackName}-shipping_db
+      AttributeDefinitions:
+        - AttributeName: email
+          AttributeType: S
+        - AttributeName: product_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: email
+          KeyType: HASH
+        - AttributeName: product_id
+          KeyType: RANGE
+      BillingMode: PAY_PER_REQUEST
+
   ApiGateway:
     Type: AWS::Serverless::Api
     Properties:
@@ -77,15 +112,13 @@ Resources:
               Action:
                 - dynamodb:Query
                 - dynamodb:PutItem
-                # - dynamodb:GetItem
-                # - dynamodb:Scan
-                # - dynamodb:UpdateItem
-                # - dynamodb:DeleteItem
               Resource:
                 - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${AWS::StackName}-products_db"
-                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${AWS::StackName}-products_db/index/product_name-index"
       FunctionName: !Sub ${AWS::StackName}-fn-check_inventory
       Handler: functions/check_inventory/function.handler
+      Environment:
+        Variables:
+          PRODUCTS_DB: !Ref ProductsTable
     Metadata:
       BuildMethod: esbuild
       BuildProperties:
@@ -112,8 +145,25 @@ Resources:
     Properties:
       Policies:
         - AWSLambdaBasicExecutionRole
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Query
+                - dynamodb:PutItem
+              Resource:
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${AWS::StackName}-shipping_db"
+            - Effect: Allow
+              Action:
+                - dynamodb:UpdateItem
+              Resource:
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${AWS::StackName}-products_db"
       FunctionName: !Sub ${AWS::StackName}-fn-create_shipping_label
       Handler: functions/create_shipping_label/function.handler
+      Environment:
+        Variables:
+          SHIPPING_DB: !Ref ShippingInfoTable
+          PRODUCTS_DB: !Ref ProductsTable
     Metadata:
       BuildMethod: esbuild
       BuildProperties:
@@ -142,25 +192,6 @@ Resources:
       Tags:
         - Key: Environment
           Value: !Ref Environment
-
-  MyProductsTable:
-    Type: AWS::DynamoDB::Table
-    Properties:
-      TableName: !Sub ${AWS::StackName}-products_db
-      AttributeDefinitions:
-        - AttributeName: product_name
-          AttributeType: S
-        - AttributeName: product_id
-          AttributeType: S
-      KeySchema:
-        - AttributeName: product_name
-          KeyType: HASH
-        - AttributeName: product_id
-          KeyType: RANGE
-      BillingMode: PAY_PER_REQUEST
-      # ProvisionedThroughput:
-      #   ReadCapacityUnits: 2
-      #   WriteCapacityUnits: 2
 
   OrderProcessing:
     Type: AWS::Serverless::StateMachine
@@ -205,7 +236,7 @@ Resources:
             Resource: arn:aws:states:::lambda:invoke
             OutputPath: $.Payload
             Parameters:
-              Payload.$: $
+              Payload.$: $.event
               FunctionName: !Ref CheckInventory
             Catch:
               - ErrorEquals:
