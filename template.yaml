@@ -19,53 +19,6 @@ Globals:
       - x86_64
 
 Resources:
-  # DeploymentBucket:
-  #   Type: AWS::S3::Bucket
-  #   Properties:
-  #     BucketName: !Sub ${AWS::StackName}-test-bucket
-  #     BucketEncryption:
-  #       ServerSideEncryptionConfiguration:
-  #         - ServerSideEncryptionByDefault:
-  #             SSEAlgorithm: AES256
-  #     Tags:
-  #       - Key: Environment
-  #         Value: !Ref Environment
-
-  ProductsTable:
-    Type: AWS::DynamoDB::Table
-    Properties:
-      TableName: !Sub ${AWS::StackName}-products_db
-      AttributeDefinitions:
-        - AttributeName: product_name
-          AttributeType: S
-        - AttributeName: product_id
-          AttributeType: S
-      KeySchema:
-        - AttributeName: product_name
-          KeyType: HASH
-        - AttributeName: product_id
-          KeyType: RANGE
-      BillingMode: PAY_PER_REQUEST
-      # ProvisionedThroughput:
-      #   ReadCapacityUnits: 2
-      #   WriteCapacityUnits: 2
-
-  ShippingInfoTable:
-    Type: AWS::DynamoDB::Table
-    Properties:
-      TableName: !Sub ${AWS::StackName}-shipping_db
-      AttributeDefinitions:
-        - AttributeName: email
-          AttributeType: S
-        - AttributeName: product_id
-          AttributeType: S
-      KeySchema:
-        - AttributeName: email
-          KeyType: HASH
-        - AttributeName: product_id
-          KeyType: RANGE
-      BillingMode: PAY_PER_REQUEST
-
   ApiGateway:
     Type: AWS::Serverless::Api
     Properties:
@@ -113,12 +66,13 @@ Resources:
                 - dynamodb:Query
                 - dynamodb:PutItem
               Resource:
-                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${AWS::StackName}-products_db"
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${AWS::StackName}-db-products"
       FunctionName: !Sub ${AWS::StackName}-fn-check_inventory
       Handler: functions/check_inventory/function.handler
       Environment:
         Variables:
-          PRODUCTS_DB: !Ref ProductsTable
+          PRODUCTS_DB: !Sub "${AWS::StackName}-db-products"
+
     Metadata:
       BuildMethod: esbuild
       BuildProperties:
@@ -152,18 +106,18 @@ Resources:
                 - dynamodb:Query
                 - dynamodb:PutItem
               Resource:
-                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${AWS::StackName}-shipping_db"
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${AWS::StackName}-db-shipping"
             - Effect: Allow
               Action:
                 - dynamodb:UpdateItem
               Resource:
-                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${AWS::StackName}-products_db"
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${AWS::StackName}-db-products"
       FunctionName: !Sub ${AWS::StackName}-fn-create_shipping_label
       Handler: functions/create_shipping_label/function.handler
       Environment:
         Variables:
-          SHIPPING_DB: !Ref ShippingInfoTable
-          PRODUCTS_DB: !Ref ProductsTable
+          SHIPPING_DB: !Sub "${AWS::StackName}-db-shipping"
+          PRODUCTS_DB: !Sub "${AWS::StackName}-db-products"
     Metadata:
       BuildMethod: esbuild
       BuildProperties:
@@ -178,6 +132,12 @@ Resources:
         - AWSLambdaBasicExecutionRole
       FunctionName: !Sub ${AWS::StackName}-fn-send_confirmation_email
       Handler: functions/send_confirmation_email/function.handler
+      # Environment:
+      #   Variables:
+      #     G_APP_FROM_EMAIL: !Sub "{{resolve:secretsmanager:order-processing-secrets-${Environment}-email-sending:SecretString.from_email}}"
+      #     G_APP_CLIENT_ID: !Sub "{{resolve:secretsmanager:order-processing-secrets-${Environment}-email-sending:SecretString.client_id}}"
+      #     G_APP_CLIENT_SECRET: !Sub "{{resolve:secretsmanager:order-processing-secrets-${Environment}-email-sending:SecretString.client_secret}}"
+      #     G_APP_REFRESH_TOKEN: !Sub "{{resolve:secretsmanager:order-processing-secrets-${Environment}-email-sending:SecretString.refresh_token}}"
     Metadata:
       BuildMethod: esbuild
       BuildProperties:
