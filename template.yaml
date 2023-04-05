@@ -130,14 +130,17 @@ Resources:
     Properties:
       Policies:
         - AWSLambdaBasicExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - ses:SendEmail
+                - ses:SendRawEmail
+              Resource: "*"
       FunctionName: !Sub ${AWS::StackName}-fn-send_confirmation_email
       Handler: functions/send_confirmation_email/function.handler
-      # Environment:
-      #   Variables:
-      #     G_APP_FROM_EMAIL: !Sub "{{resolve:secretsmanager:order-processing-secrets-${Environment}-email-sending:SecretString.from_email}}"
-      #     G_APP_CLIENT_ID: !Sub "{{resolve:secretsmanager:order-processing-secrets-${Environment}-email-sending:SecretString.client_id}}"
-      #     G_APP_CLIENT_SECRET: !Sub "{{resolve:secretsmanager:order-processing-secrets-${Environment}-email-sending:SecretString.client_secret}}"
-      #     G_APP_REFRESH_TOKEN: !Sub "{{resolve:secretsmanager:order-processing-secrets-${Environment}-email-sending:SecretString.refresh_token}}"
+      Environment:
+        Variables:
+          FROM_EMAIL: !Sub "{{resolve:secretsmanager:order-processing-${Environment}-secrets-notification-email:SecretString:from_email}}"
     Metadata:
       BuildMethod: esbuild
       BuildProperties:
