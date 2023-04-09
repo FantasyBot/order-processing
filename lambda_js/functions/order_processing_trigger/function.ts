@@ -1,5 +1,5 @@
 import { APIGatewayProxyEvent } from "aws-lambda";
-import { StepFunctions } from "aws-sdk";
+import StepFunctions from "aws-sdk/clients/stepfunctions";
 import { EventBodyModel } from "./models";
 
 // {

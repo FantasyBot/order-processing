@@ -54,31 +54,31 @@ Resources:
         EntryPoints:
           - functions/order_processing_trigger/function.ts
 
-  CheckInventory:
-    Type: AWS::Serverless::Function
-    Properties:
-      Policies:
-        - AWSLambdaBasicExecutionRole
-        - Version: "2012-10-17"
-          Statement:
-            - Effect: Allow
-              Action:
-                - dynamodb:Query
-                - dynamodb:PutItem
-              Resource:
-                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${AWS::StackName}-db-products"
-      FunctionName: !Sub ${AWS::StackName}-fn-check_inventory
-      Handler: functions/check_inventory/function.handler
-      Environment:
-        Variables:
-          PRODUCTS_DB: !Sub "${AWS::StackName}-db-products"
+  # CheckInventory:
+  #   Type: AWS::Serverless::Function
+  #   Properties:
+  #     Policies:
+  #       - AWSLambdaBasicExecutionRole
+  #       - Version: "2012-10-17"
+  #         Statement:
+  #           - Effect: Allow
+  #             Action:
+  #               - dynamodb:Query
+  #               - dynamodb:PutItem
+  #             Resource:
+  #               - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${AWS::StackName}-db-products"
+  #     FunctionName: !Sub ${AWS::StackName}-fn-check_inventory
+  #     Handler: functions/check_inventory/function.handler
+  #     Environment:
+  #       Variables:
+  #         PRODUCTS_DB: !Sub "${AWS::StackName}-db-products"
 
-    Metadata:
-      BuildMethod: esbuild
-      BuildProperties:
-        Target: es2020
-        EntryPoints:
-          - functions/check_inventory/function.ts
+  #   Metadata:
+  #     BuildMethod: esbuild
+  #     BuildProperties:
+  #       Target: es2020
+  #       EntryPoints:
+  #         - functions/check_inventory/function.ts
 
   VerifyPayment:
     Type: AWS::Serverless::Function
@@ -171,12 +171,20 @@ Resources:
         - Statement:
             - Effect: Allow
               Action:
+                - dynamodb:Query
+                - dynamodb:UpdateItem
+              Resource:
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${AWS::StackName}-db-products"
+            - Effect: Allow
+              Action:
+                - dynamodb:PutItem
+              Resource:
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${AWS::StackName}-db-shipping"
+            - Effect: Allow
+              Action:
                 - lambda:InvokeFunction
               Resource:
-                - !GetAtt CheckInventory.Arn
                 - !GetAtt VerifyPayment.Arn
-                - !GetAtt CreateShippingLabel.Arn
-                - !GetAtt SendConfirmationEmail.Arn
             - Effect: Allow
               Action:
                 - events:PutTargets
@@ -191,22 +199,29 @@ Resources:
                 - !Sub "arn:aws:events:${AWS::Region}:${AWS::AccountId}:event-bus/default"
       Definition:
         Comment: Verify Order Processing Steps
-        StartAt: Check Inventory
+        StartAt: Check Item
         TimeoutSeconds: 300
         States:
-          Check Inventory:
+          Check Item:
             Type: Task
-            Resource: arn:aws:states:::lambda:invoke
-            OutputPath: $.Payload
+            Resource: arn:aws:states:::aws-sdk:dynamodb:query
+            # OutputPath: $.Payload
             Parameters:
-              Payload.$: $.event
-              FunctionName: !Ref CheckInventory
+              TableName: !Sub "${AWS::StackName}-db-products"
+              KeyConditionExpression: product_name = :product_name
+              FilterExpression: count_in_stock >= :quantity
+              ExpressionAttributeValues:
+                ":product_name":
+                  S.$: $.event.product.product_name
+                ":quantity":
+                  N.$: $.event.product.quantity
+            ResultPath: $.shipping_information
+            Next: Verify Payment
             Catch:
               - ErrorEquals:
                   - States.ALL
                 Comment: Runtime Exception
                 Next: Send Error Message
-            Next: Verify Payment
           Verify Payment:
             Type: Task
             Resource: arn:aws:states:::lambda:invoke
@@ -219,14 +234,30 @@ Resources:
                   - States.ALL
                 Comment: Runtime Exception
                 Next: Send Error Message
-            Next: Create Shipping Label
-          Create Shipping Label:
+            Next: Create Shipping Record
+          Create Shipping Record:
             Type: Task
-            Resource: arn:aws:states:::lambda:invoke
-            OutputPath: $.Payload
+            Resource: arn:aws:states:::aws-sdk:dynamodb:putItem
+            OutputPath: $
             Parameters:
-              Payload.$: $
-              FunctionName: !Ref CreateShippingLabel
+              TableName: !Sub "${AWS::StackName}-db-shipping"
+              Item:
+                email:
+                  S.$: $.event.costumer.email
+                product_id:
+                  S.$: $.shipping_information.Items[0].product_id.S
+                user_name:
+                  S.$: $.event.costumer.user_name
+                address:
+                  S.$: $.event.costumer.address
+                product_name:
+                  S.$: $.shipping_information.Items[0].product_name.S
+                product_quantity:
+                  N.$: $.event.product.quantity
+                product_price:
+                  N.$: $.shipping_information.Items[0].product_price.N
+                shipped:
+                  S: "true"
             Catch:
               - ErrorEquals:
                   - States.ALL
