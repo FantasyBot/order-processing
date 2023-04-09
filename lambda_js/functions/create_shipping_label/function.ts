@@ -2,8 +2,6 @@ import AWS from "aws-sdk";
 const docClient = new AWS.DynamoDB.DocumentClient();
 
 export async function handler(input: any) {
-  console.log("event in check_inventory  ---> ", input);
-
   // 1. Create shipping label ( new record depending on prdocut information )
   const shippingParams = {
     TableName: process.env.SHIPPING_DB,

@@ -1,19 +1,19 @@
 import { APIGatewayProxyEvent } from "aws-lambda";
 import { StepFunctions } from "aws-sdk";
-// import { EventBodyModel } from "./models";
+import { EventBodyModel } from "./models";
 
 // {
 //   "costumer":{
-//      "name":"guram svanidze",
+//      "user_name":"guram svanidze",
 //      "email":"guramisvanidze11@gmail.com",
 //      "address":"mindeli street, 9b"
 //   },
 //   "payment_information":{
 //      "card_number":"123456789",
-//      "name":"GURAMI SVANIDZE"
+//      "card_owner":"GURAMI SVANIDZE"
 //   },
 //   "product":{
-//      "name":"ram_240_gtx83",
+//      "product_name":"ram_240_gtx83",
 //      "quantity":"1",
 //   }
 // }
@@ -34,9 +34,9 @@ export async function handler(event: APIGatewayProxyEvent) {
       };
     }
 
-    // const body = await new EventBodyModel(rawBody)
-    //   .serialize()
-    //   .catch((error) => Promise.reject({ code: 400, message: error }));
+    const body = await new EventBodyModel(rawBody)
+      .serialize()
+      .catch((error) => Promise.reject({ code: 400, message: error }));
 
     const sf = new StepFunctions();
 
@@ -44,7 +44,7 @@ export async function handler(event: APIGatewayProxyEvent) {
       .startExecution({
         stateMachineArn: process.env.ORDER_PROCESSING_ARN as string,
         input: JSON.stringify({
-          event: rawBody,
+          event: body,
         }),
       })
       .promise();

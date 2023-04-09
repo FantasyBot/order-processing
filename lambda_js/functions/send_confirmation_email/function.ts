@@ -10,14 +10,7 @@ export async function handler(input: any) {
     Message: {
       Body: {
         Text: {
-          Data: `<div>
-                   <h2>Your order (${input.product.name}) has been shipped!</h2>
-                   <h2>Product Information:</h2>
-                   <p>product name : ${input.shipping_information.product_name}</p>
-                   <p>quantity : ${input.product.quantity}</p>
-                   <p>product price : ${input.shipping_information.product_price}</p>
-                   <p>address : ${input.costumer.address}</p>
-                 </div>`,
+          Data: `Your product (${input?.product?.product_name}, qty: ${input?.product?.quantity}) has been shipped`,
         },
       },
       Subject: {
@@ -34,4 +27,10 @@ export async function handler(input: any) {
 // `AWS SES` in free tier has only 200 email in a day for free (6200 in month).
 //  without encreasing limits had to verify every email - `sender` and `receiver`
 //  If you encrease the limit (not free tier as I know) you would be able to send 50000 email each month
-//  and you have to verify only `sender` email.
+//  and you have to verify ONLY `sender` email.
+
+//  TO VERIFY EMAIL WITH CLI:
+//  aws ses verify-email-identity --email-address your-email-address --region eu-central-1
+
+// LIST VERIFIED ADRESSES:
+// aws ses list-identities --region eu-central-1

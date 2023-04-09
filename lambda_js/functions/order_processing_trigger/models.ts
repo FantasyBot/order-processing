@@ -1,75 +1,103 @@
 import {
-  IsNotEmpty,
   IsObject,
   IsString,
-  IsUUID,
-  validate,
+  ValidateNested,
 } from "class-validator";
 
-// {
-//   "costumer":{
-//      "name":"guram svanidze",
-//      "email":"guramisvanidze11@gmail.com",
-//      "address":"mindeli street, 9b"
-//   },
-//   "payment_information":{
-//      "card_number":"123456789",
-//      "name":"GURAMI SVANIDZE"
-//   },
-//   "product":{
-//      "name":"ram_240_gtx83",
-//      "quantity":"1",
-//      "price":"100$"
-//   }
-// }
+import { BaseValidator } from "@fantasybot/order-processing-lib/lib/shared/validator/base";
 
-export abstract class BaseValidator<T = unknown> {
-  public abstract serialize(): Promise<T>;
-
-  protected async validate() {
-    const validationErrors = await validate(this);
-    if (validationErrors.length) {
-      throw validationErrors;
-    }
-  }
+interface EventBodyCostumerModelType {
+  user_name: string;
+  email: string;
+  address: string;
 }
 
+interface EventBodyPaymentInformationModelType {
+  card_number: string;
+  card_owner: string;
+}
+
+interface EventBodyProductModelType {
+  product_name: string;
+  quantity: string;
+}
 interface EventBodyModelType {
-  id?: string;
-  type?: string;
-  value?: string;
+  costumer: EventBodyCostumerModelType;
+  payment_information: EventBodyPaymentInformationModelType;
+  product: EventBodyProductModelType;
 }
 
-export class EventBodyModel
-  extends BaseValidator
-  implements EventBodyModelType
-{
-  constructor({ id, type, value }: EventBodyModelType) {
-    super();
-    this.id = id;
-    this.type = type;
-    this.value = value;
+export class EventBodyCostumerModel implements EventBodyCostumerModelType {
+  constructor({ user_name, email, address }: EventBodyCostumerModelType) {
+    this.user_name = user_name;
+    this.email = email;
+    this.address = address;
   }
 
-  @IsUUID()
-  @IsNotEmpty()
   @IsString()
-  public id: EventBodyModelType["id"];
+  public user_name: EventBodyCostumerModelType["user_name"];
 
-  @IsNotEmpty()
   @IsString()
-  public type: EventBodyModelType["type"];
+  public email: EventBodyCostumerModelType["email"];
 
-  @IsNotEmpty()
   @IsString()
-  public value: EventBodyModelType["value"];
+  public address: EventBodyCostumerModelType["address"];
+}
+
+export class EventBodyPaymentInformationModel implements EventBodyPaymentInformationModelType {
+  constructor({  card_number, card_owner }: EventBodyPaymentInformationModelType) {
+    this.card_number = card_number;
+    this.card_owner= card_owner;
+  }
+
+  @IsString()
+  public card_number: EventBodyPaymentInformationModelType["card_number"];
+
+  @IsString()
+  public card_owner: EventBodyPaymentInformationModelType["card_owner"];
+}
+
+export class EventBodyProductModel implements EventBodyProductModelType {
+  constructor({ product_name, quantity }: EventBodyProductModelType) {
+    this.product_name = product_name;
+    this.quantity = quantity;
+  }
+
+  @IsString()
+  public product_name: EventBodyProductModelType["product_name"];
+
+  @IsString()
+  public quantity: EventBodyProductModelType["quantity"];
+}
+
+export class EventBodyModel extends BaseValidator {
+  constructor({ costumer, payment_information, product }: EventBodyModelType) {
+    super();
+
+    this.costumer = new EventBodyCostumerModel(costumer);
+    this.payment_information = new EventBodyPaymentInformationModel(payment_information);
+    this.product = new EventBodyProductModel(product);
+  }
+
+  
+  @IsObject()
+  @ValidateNested()
+  public costumer: EventBodyModelType["costumer"];
+
+  @IsObject()
+  @ValidateNested()
+  public payment_information: EventBodyModelType["payment_information"];
+
+  @IsObject()
+  @ValidateNested()
+  public product: EventBodyModelType["product"];
 
   public async serialize() {
     await this.validate();
     return {
-      id: this.id!,
-      type: this.type!,
-      value: this.value!,
+      costumer: this.costumer!,
+      payment_information: this.payment_information!,
+      product: this.product!,
     };
   }
 }
