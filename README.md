@@ -1,58 +1,58 @@
-# Order Processing
+# Order Processing Application
 
-This AWS CloudFormation template deploys a serverless application for order processing.
+This repository contains the CloudFormation template for deploying the Order Processing Application on AWS. The application uses AWS Serverless technologies to process orders, verify payments, and create shipping records.
 
-## Architecture Overview
+graph TD
+A[Job A] --> B[Job B]
+A[Job A] --> C[Job C]
+B[Job B] --> D[Job D]
+C[Job C] --> D[Job D]
+D[Job D] --> E[Job E]
 
-The architecture consists of the following AWS services:
+## Architecture
 
-- AWS Lambda functions
+The application is built using the following AWS services:
+
+- AWS Lambda
 - AWS Step Functions
-- Amazon API Gateway
-- Amazon SQS
-- Amazon DynamoDB
-- Amazon EventBridge
+- AWS API Gateway
+- AWS DynamoDB
+- AWS Simple Email Service (SES)
+- AWS EventBridge (formerly CloudWatch Events)
+- AWS SQS
 
-<!-- ![Architecture Overview](https://user-images.githubusercontent.com/12345678/123456789/abcdef/architecture.png) -->
+## This repository contains integrations from:
 
-## Deployment
+- ### order-processing-dynamodb
+- ### order-processing-lib
+- ### order-processing-s3
+- ### order-processing-secrets
 
-To deploy the application, follow these steps:
+#
 
-1. Create a new CloudFormation stack using this template.
-2. Set the `Environment` parameter to either `dev` or `prod`.
-3. Wait for the stack to finish creating.
+## There are several steps to keep in mind:
 
-## Resources
+- I am using github library `@fantasybot/order-processing-lib`  
+   `.npmrc` file should be created with content:  
+   `@fantasybot:registry=https://npm.pkg.github.com/`  
+   `//npm.pkg.github.com/:\_authToken=your_github_classic_token`
+- `AWS Named Profiles` configure it with your aws credentials and run:  
+  `export AWS_PROFILE=your_profile_name && sam build && sam deploy --config-env dev`  
+  you alsow need to install `sam-cli`
 
-The template creates the following AWS resources:
+#
 
-- `ApiGateway`: An Amazon API Gateway instance that routes incoming requests to the `OrderProcessing` Step Function.
-- `OrderProcessingTrigger`: An AWS Lambda function that triggers the `OrderProcessing` Step Function when an order is received.
-- `CheckInventory`: An AWS Lambda function that checks the inventory for the requested products.
-- `VerifyPayment`: An AWS Lambda function that verifies the payment for the order.
-- `CreateShippingLabel`: An AWS Lambda function that creates the shipping label for the order.
-- `SendConfirmationEmail`: An AWS Lambda function that sends a confirmation email to the customer.
-- `OrderProcessingDLQ`: An Amazon SQS dead-letter queue for the `OrderProcessing` Step Function.
-- `MyProductsTable`: An Amazon DynamoDB table for storing product information.
-- `OrderProcessing`: An AWS Step Function that processes incoming orders.
+## AWS SES
 
-## Parameters
+AWS SES in free tier has only 200 email in a day for free (6200 in month).  
+without encreasing limits had to verify every email - `sender` and `receiver`  
+If you encrease the limit (not free tier as I know) you would be able to send 50000 email each month  
+and you have to verify ONLY `sender` email.
 
-The following parameters can be set when creating the CloudFormation stack:
+TO VERIFY EMAIL WITH CLI:  
+`aws ses verify-email-identity --email-address your-email-address --region eu-central-1`
 
-- `Environment`: The environment to deploy the application to. Must be either `dev` or `prod`.
+LIST VERIFIED ADRESSES:  
+`aws ses list-identities --region eu-central-1`
 
-## Globals
-
-The following global settings are applied to all Lambda functions:
-
-- `Timeout`: The maximum amount of time the function can run before it times out.
-- `MemorySize`: The amount of memory the function is allocated.
-- `Runtime`: The runtime environment for the function.
-- `CodeUri`: The location of the function's source code.
-- `Architectures`: The CPU architectures that the function supports.
-
-## License
-
-This project is licensed under the MIT License. See LICENSE.md for more information.
+#
