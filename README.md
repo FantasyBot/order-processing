@@ -2,12 +2,7 @@
 
 This repository contains the CloudFormation template for deploying the Order Processing Application on AWS. The application uses AWS Serverless technologies to process orders, verify payments, and create shipping records.
 
-graph TD
-A[Job A] --> B[Job B]
-A[Job A] --> C[Job C]
-B[Job B] --> D[Job D]
-C[Job C] --> D[Job D]
-D[Job D] --> E[Job E]
+![Flow](https://order-processing-public-pucket.s3.eu-central-1.amazonaws.com/flow.png)
 
 ## Architecture
 
