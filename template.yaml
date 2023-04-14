@@ -139,13 +139,14 @@ Resources:
                   S.$: $.event.product.product_name
                 ":quantity":
                   N.$: $.event.product.quantity
-            ResultPath: $.shipping_information
-            Next: Verify Payment
-            Catch:
+            Retry:
               - ErrorEquals:
                   - States.ALL
-                Comment: Runtime Exception
-                Next: Send Error Message
+                IntervalSeconds: 5
+                MaxAttempts: 3
+                BackoffRate: 2
+            ResultPath: $.shipping_information
+            Next: Verify Payment
           Verify Payment:
             Type: Task
             Resource: arn:aws:states:::lambda:invoke
@@ -181,13 +182,14 @@ Resources:
                   N.$: $.shipping_information.Items[0].product_price.N
                 shipped:
                   S: "true"
-            ResultPath: $.create_shipping_record_output
-            Next: Update Product Details
-            Catch:
+            Retry:
               - ErrorEquals:
                   - States.ALL
-                Comment: Runtime Exception
-                Next: Send Error Message
+                IntervalSeconds: 5
+                MaxAttempts: 3
+                BackoffRate: 2
+            ResultPath: $.create_shipping_record_output
+            Next: Update Product Details
           Update Product Details:
             Type: Task
             Resource: arn:aws:states:::aws-sdk:dynamodb:updateItem
@@ -205,13 +207,14 @@ Resources:
                 ":count_in_stock":
                   N.$: $.shipping_information.Items[0].count_in_stock.N
               ReturnValues: "ALL_NEW"
-            ResultPath: $.update_product_detail_result
-            Next: Send Confirmation Email
-            Catch:
+            Retry:
               - ErrorEquals:
                   - States.ALL
-                Comment: Runtime Exception
-                Next: Send Error Message
+                IntervalSeconds: 5
+                MaxAttempts: 3
+                BackoffRate: 2
+            ResultPath: $.update_product_detail_result
+            Next: Send Confirmation Email
           Send Confirmation Email:
             Type: Task
             Resource: arn:aws:states:::aws-sdk:ses:sendEmail
@@ -231,10 +234,6 @@ Resources:
                 MaxAttempts: 2
                 IntervalSeconds: 3
                 BackoffRate: 2
-            Catch:
-              - ErrorEquals:
-                  - "States.ALL"
-                Next: Send Error Message
             Next: Success
           Success:
             Type: Succeed
