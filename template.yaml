@@ -68,6 +68,25 @@ Resources:
         EntryPoints:
           - functions/verify_payment/function.ts
 
+  HandleSQSErrors:
+    Type: AWS::Serverless::Function
+    Properties:
+      Policies:
+        - AWSLambdaBasicExecutionRole
+      FunctionName: !Sub ${AWS::StackName}-fn-handle_errors
+      Handler: functions/handle_errors/function.handler
+      Events:
+        SQSEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt OrderProcessingDLQ.Arn
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Target: es2020
+        EntryPoints:
+          - functions/handle_errors/function.ts
+
   OrderProcessingDLQ:
     Type: AWS::SQS::Queue
     Properties:
@@ -122,6 +141,10 @@ Resources:
                 - events:PutEvents
               Resource:
                 - !Sub "arn:aws:events:${AWS::Region}:${AWS::AccountId}:event-bus/default"
+            - Effect: Allow
+              Action:
+                - sqs:SendMessage
+              Resource: !GetAtt OrderProcessingDLQ.Arn
       Definition:
         Comment: Verify Order Processing Steps
         StartAt: Check Item
