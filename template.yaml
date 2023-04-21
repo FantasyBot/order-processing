@@ -73,8 +73,17 @@ Resources:
     Properties:
       Policies:
         - AWSLambdaBasicExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - ses:SendEmail
+                - ses:SendRawEmail
+              Resource: "*"
       FunctionName: !Sub ${AWS::StackName}-fn-handle_errors
       Handler: functions/handle_errors/function.handler
+      Environment:
+        Variables:
+          FROM_EMAIL: !Sub "{{resolve:secretsmanager:order-processing-${Environment}-secrets-notification-email:SecretString:from_email}}"
       Events:
         SQSEvent:
           Type: SQS
@@ -182,6 +191,7 @@ Resources:
               - ErrorEquals:
                   - States.ALL
                 Comment: Runtime Exception
+                ResultPath: $.Cause
                 Next: Send Error Message
           Create Shipping Record:
             Type: Task
@@ -264,12 +274,15 @@ Resources:
             Type: Task
             Resource: arn:aws:states:::sqs:sendMessage
             Parameters:
-              MessageBody.$: $
+              MessageBody.$: $.Cause.Cause
+              MessageAttributes:
+                email:
+                  DataType: String
+                  StringValue.$: $.event.costumer.email
               QueueUrl: !Ref OrderProcessingDLQ
             Next: Fail
           Fail:
             Type: Fail
-
 Outputs:
   ApiID:
     Value: !Ref ApiGateway
